@@ -715,17 +715,30 @@ function loadState() {
   db.ref('/').on('value', snapshot => {
     const data = snapshot.val() || {};
     console.log('🔥 Data loaded from Firebase:', data);
-    
+
     if (!data.activities && !data.transcribers) {
       console.log('📌 No data found, seeding defaults...');
       seedDefaultData();
       return;
     }
-    appData = data.activities || [];
+
+    // Convert activities to array if necessary
+    let activities = data.activities || [];
+    if (!Array.isArray(activities)) {
+      activities = Object.values(activities);
+      console.log('🔄 Converted activities object to array:', activities);
+    }
+
+    appData = activities;
     transcribers = data.transcribers || [];
     adminPassword = data.password || 'rald123';
-    appData._order = data.order || appData.map(a => a.id);
-    
+
+    if (data.order && Array.isArray(data.order)) {
+      appData._order = data.order;
+    } else {
+      appData._order = appData.map(a => a.id);
+    }
+
     if (!isDataLoaded) {
       isDataLoaded = true;
       initApp();
