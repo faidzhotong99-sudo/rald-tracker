@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RALD Transcript Tracker System</title>
+<!-- Include SortableJS for drag and drop -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+:root {
+  --green-900: #0D3B1A; --green-800: #1B5E20; --green-700: #2E7D32;
+  --green-600: #388E3C; --green-500: #43A047; --green-400: #66BB6A;
+  --green-300: #A5D6A7; --green-200: #C8E6C9; --green-100: #E8F5E9;
+  --green-50: #F1F8E9; --white: #FFFFFF;
+  --gray-50: #FAFAFA; --gray-100: #F5F5F5; --gray-200: #EEEEEE;
+  --gray-300: #E0E0E0; --gray-500: #9E9E9E; --gray-700: #616161; --gray-900: #212121;
+  --red-50: #FFEBEE; --red-100: #FFCDD2; --red-200: #EF9A9A; --red-500: #EF5350;
+  --red-600: #E53935; --red-700: #D32F2F; --red-800: #C62828; --red-900: #B71C1C;
+  --orange-50: #FFF3E0; --orange-100: #FFE0B2; --orange-500: #FF9800; --orange-600: #FB8C00; --orange-700: #F57C00;
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05); --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12); --shadow-xl: 0 16px 48px rgba(0,0,0,0.18);
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #F1F8E9 0%, #FFFFFF 40%, #E8F5E9 100%);
+  background-attachment: fixed; min-height: 100vh; color: var(--gray-900); line-height: 1.5;
+}
+
+/* Drag and drop visual feedback */
+tr.drag-over {
+  border-top: 3px solid #2E7D32;
+  background: #E8F5E9 !important;
+}
+tr[draggable="true"] {
+  cursor: grab;
+}
+tr[draggable="true"]:hover {
+  background: #F1F8E9;
+}
+.drag-handle {
+  cursor: grab;
+  color: #999;
+  font-size: 18px;
+  user-select: none;
+}
+.drag-handle:hover {
+  color: #2E7D32;
+}
+.sortable-chosen {
+  background: #C8E6C9 !important;
+}
+.sortable-ghost {
+  opacity: 0.4;
+  background: #A5D6A7 !important;
+}
+
+/* ============ LOGIN SCREEN ============ */
+.login-screen {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(67,160,71,0.4) 0%, transparent 50%),
+              radial-gradient(circle at 80% 80%, rgba(46,125,50,0.4) 0%, transparent 50%),
+              linear-gradient(135deg, #0D3B1A 0%, #1B5E20 50%, #2E7D32 100%);
+  display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; overflow: hidden;
+}
+.login-orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; animation: floatOrb 8s ease-in-out infinite; }
+.login-orb-1 { width: 300px; height: 300px; background: var(--green-400); top: -100px; left: -100px; }
+.login-orb-2 { width: 400px; height: 400px; background: var(--green-600); bottom: -150px; right: -150px; animation-delay: 4s; }
+@keyframes floatOrb { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, 30px); } }
+
+.login-card {
+  background: rgba(255,255,255,0.98); backdrop-filter: blur(20px);
+  padding: 50px 40px; border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.2);
+  width: 100%; max-width: 460px; text-align: center; position: relative; z-index: 1;
+  animation: cardEntrance 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes cardEntrance { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.seal-container { width: 130px; height: 130px; margin: 0 auto 24px; position: relative; display: flex; align-items: center; justify-content: center; }
+.seal-container::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; background: conic-gradient(from 0deg, var(--green-300), var(--green-600), var(--green-300)); animation: rotateRing 8s linear infinite; z-index: 0; }
+.seal-container::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: white; z-index: 1; }
+@keyframes rotateRing { to { transform: rotate(360deg); } }
+.seal { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15)); position: relative; z-index: 2; border-radius: 50%; }
+.seal-placeholder { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, var(--green-700), var(--green-500)); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px; font-weight: bold; position: relative; z-index: 2; box-shadow: 0 4px 16px rgba(46,125,50,0.4); letter-spacing: 1px; }
+
+.login-card h1 { color: var(--green-800); font-size: 24px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.5px; }
+.login-card .subtitle { color: var(--gray-700); font-size: 13px; margin-bottom: 32px; font-weight: 500; }
+.login-card form { display: flex; flex-direction: column; gap: 16px; }
+.login-card input { padding: 14px 18px; border: 2px solid var(--gray-200); border-radius: 12px; font-size: 15px; background: var(--gray-50); transition: var(--transition); text-align: center; letter-spacing: 2px; }
+.login-card input:focus { outline: none; border-color: var(--green-500); background: white; box-shadow: 0 0 0 4px rgba(67,160,71,0.1); }
+.login-card button { padding: 14px 24px; background: linear-gradient(135deg, var(--green-700), var(--green-500)); color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: var(--transition); box-shadow: 0 4px 12px rgba(46,125,50,0.3); letter-spacing: 0.5px; }
+.login-card button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(46,125,50,0.4); }
+.login-hint { margin-top: 20px; font-size: 12px; color: var(--gray-500); }
+.login-hint strong { color: var(--green-700); }
+.login-error { color: #D32F2F; font-size: 13px; margin-top: -8px; display: none; animation: shake 0.4s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+/* ============ MAIN APP ============ */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ============ CLEAN PROFESSIONAL HEADER ============ */
+.app-header {
+  background: linear-gradient(135deg, var(--green-900) 0%, var(--green-800) 40%, var(--green-600) 100%);
+  color: white;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  min-height: 64px;
+}
+.app-header::before { display: none; }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 28px;
+  position: relative;
+  z-index: 2;
+}
+.header-seal {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+  border: 1px solid rgba(255,255,255,0.2);
+  transition: none;
+  flex-shrink: 0;
+}
+.app-header:hover .header-seal { transform: none; box-shadow: none; }
+.header-seal-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+.app-header:hover .header-seal-placeholder { transform: none; }
+.header-titles { display: flex; flex-direction: column; gap: 1px; }
+.app-header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.2px; line-height: 1.3; color: white; text-shadow: none; }
+.app-header .subtitle { font-size: 10px; opacity: 0.7; letter-spacing: 0.5px; font-weight: 400; text-transform: uppercase; }
+.header-right { display: flex; gap: 8px; padding: 12px 28px; position: relative; z-index: 2; }
+.btn-icon {
+  background: rgba(255,255,255,0.08);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  backdrop-filter: none;
+}
+.btn-icon:hover {
+  background: rgba(255,255,255,0.18);
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* ============ STATS ============ */
+.stats { padding: 24px 32px 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.stat-card { background: white; padding: 18px 22px; border-radius: var(--radius-md); box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 16px; border-left: 4px solid var(--green-500); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; position: relative; overflow: hidden; cursor: pointer; }
+.stat-card::before { content: ''; position: absolute; top: 0; right: 0; width: 100px; height: 100px; background: radial-gradient(circle, rgba(67,160,71,0.08) 0%, transparent 70%); transform: translate(30%, -30%); }
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.stat-card:active { transform: translateY(2px) scale(0.98); }
+.stat-card.active { border-left-color: var(--green-700); box-shadow: 0 0 0 2px var(--green-400), var(--shadow-md); }
+.stat-card.active::after { content: 'Filtered'; position: absolute; top: 8px; right: 10px; font-size: 10px; font-weight: 700; color: var(--green-700); background: var(--green-100); padding: 2px 6px; border-radius: 4px; }
+.stat-icon { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, var(--green-100), var(--green-200)); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--green-700); flex-shrink: 0; transition: transform 0.3s ease; }
+.stat-card:hover .stat-icon { transform: rotate(-10deg) scale(1.1); }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--green-800); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; font-weight: 600; }
+
+.stat-card-overdue { border-left-color: var(--red-600); }
+.stat-card-overdue::before { background: radial-gradient(circle, rgba(229,57,53,0.08) 0%, transparent 70%); }
+.stat-card-overdue .stat-icon { background: linear-gradient(135deg, var(--red-50), var(--red-100)); color: var(--red-800); }
+.stat-card-overdue .stat-value { color: var(--red-800); }
+.stat-card-overdue:hover .stat-icon { transform: rotate(-10deg) scale(1.1); }
+.stat-card-overdue.active { border-left-color: var(--red-800); box-shadow: 0 0 0 2px var(--red-300), var(--shadow-md); }
+.stat-card-overdue.active::after { color: var(--red-800); background: var(--red-50); }
+
+/* ============ OVERDUE PANEL ============ */
+.overdue-panel {
+  margin: 16px 32px 0; border-radius: var(--radius-md); overflow: hidden;
+  box-shadow: var(--shadow-md); border: 1px solid var(--red-200);
+  background: white; animation: fadeIn 0.35s ease;
+  transition: box-shadow 0.3s ease;
+}
+.overdue-panel:hover { box-shadow: var(--shadow-lg); }
+.overdue-panel.fs-active {
+  position: fixed; inset: 0; z-index: 300; margin: 0;
+  border-radius: 0; border: none;
+}
+.overdue-panel.fs-active .overdue-body { max-height: calc(100vh - 54px); }
+
+.overdue-header {
+  background: linear-gradient(135deg, var(--red-800), var(--red-600));
+  color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; user-select: none; transition: var(--transition);
+}
+.overdue-header:hover { background: linear-gradient(135deg, var(--red-900), var(--red-700)); }
+.overdue-header-left { display: flex; align-items: center; gap: 12px; }
+.overdue-pulse-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: #FF5252;
+  box-shadow: 0 0 0 0 rgba(255,82,82,0.7); animation: pulseDot 1.5s ease-in-out infinite;
+}
+@keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(255,82,82,0.7); } 70% { box-shadow: 0 0 0 8px rgba(255,82,82,0); } 100% { box-shadow: 0 0 0 0 rgba(255,82,82,0); } }
+.overdue-title { font-size: 13px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+.overdue-count-badge {
+  background: rgba(255,255,255,0.25); padding: 2px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 700;
+}
+.overdue-header-actions { display: flex; align-items: center; gap: 8px; }
+.overdue-chevron { font-size: 12px; transition: transform 0.3s ease; cursor: pointer; }
+.overdue-chevron.collapsed { transform: rotate(-90deg); }
+
+.btn-fs {
+  background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.25);
+  color: white; width: 30px; height: 30px; border-radius: 6px; cursor: pointer;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  transition: var(--transition); flex-shrink: 0;
+}
+.btn-fs:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
+
+.overdue-body { max-height: 500px; overflow-y: auto; transition: max-height 0.4s ease, padding 0.3s ease; }
+.overdue-body.collapsed { max-height: 0; padding: 0 !important; overflow: hidden; }
+.overdue-grid { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.overdue-item {
+  display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px;
+  border-radius: var(--radius-sm); border: 1px solid var(--red-100);
+  background: linear-gradient(135deg, #FFFDFD 0%, var(--red-50) 100%);
+  transition: var(--transition); position: relative; overflow: hidden;
+}
+.overdue-item:hover { border-color: var(--red-300); box-shadow: var(--shadow-sm); transform: translateX(4px); }
+.overdue-item.severity-high { border-left: 4px solid var(--red-600); }
+.overdue-item.severity-med { border-left: 4px solid var(--orange-600); }
+.overdue-item.severity-low { border-left: 4px solid var(--orange-500); }
+
+.overdue-role-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+  border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+}
+.overdue-role-badge.transcriber { background: var(--orange-100); color: var(--orange-700); }
+.overdue-role-badge.reviewer { background: #E3F2FD; color: #1565C0; }
+
+.overdue-info { flex: 1; min-width: 0; }
+.overdue-person-name { font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 2px; }
+.overdue-activity-name { font-size: 12px; color: var(--gray-700); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.overdue-meta-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.overdue-meta-item { font-size: 11px; color: var(--gray-500); display: flex; align-items: center; gap: 4px; }
+.overdue-meta-item strong { color: var(--gray-700); font-weight: 600; }
+
+.overdue-days-badge {
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 800;
+  white-space: nowrap; flex-shrink: 0; text-align: center; line-height: 1.2;
+}
+.overdue-days-badge.high { background: var(--red-100); color: var(--red-800); }
+.overdue-days-badge.med { background: var(--orange-100); color: var(--orange-700); }
+.overdue-days-badge.low { background: #FFF8E1; color: #F57F17; }
+.overdue-days-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; opacity: 0.8; }
+
+.overdue-empty { padding: 30px 20px; text-align: center; color: var(--gray-500); font-size: 13px; }
+
+/* ============ TOOLBAR ============ */
+.toolbar { padding: 16px 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.search-box { flex: 1; min-width: 200px; position: relative; }
+.search-box input { width: 100%; padding: 11px 16px 11px 42px; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 14px; background: white; transition: var(--transition); }
+.search-box input:focus { outline: none; border-color: var(--green-500); box-shadow: 0 0 0 4px rgba(67,160,71,0.1); }
+.search-box::before { content: '🔍'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; opacity: 0.5; }
+.filter-select { padding: 11px 16px; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 14px; background: white; cursor: pointer; transition: var(--transition); }
+.filter-select:focus { outline: none; border-color: var(--green-500); }
+.btn-primary { background: linear-gradient(135deg, var(--green-700), var(--green-500)); color: white; border: none; padding: 11px 22px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: var(--transition); box-shadow: 0 4px 12px rgba(46,125,50,0.3); display: flex; align-items: center; gap: 6px; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(46,125,50,0.4); }
+.btn-secondary { background: white; color: var(--green-700); border: 2px solid var(--green-200); padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 6px; }
+.btn-secondary:hover { background: var(--green-50); border-color: var(--green-500); }
+
+/* ============ TABLE CONTAINER ============ */
+.table-wrapper { margin: 0 32px 32px; position: relative; }
+.table-container {
+  background: white; border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+  overflow: auto; border: 1px solid var(--gray-200);
+  max-height: calc(100vh - 380px);
+  transition: max-height 0.4s ease, border-radius 0.3s ease, box-shadow 0.3s ease;
+}
+.table-container:hover { box-shadow: var(--shadow-lg); }
+
+.table-wrapper.fs-active {
+  position: fixed; inset: 0; z-index: 300; margin: 0;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  display: flex; flex-direction: column; padding: 0;
+  animation: fsFadeIn 0.25s ease;
+}
+@keyframes fsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.table-wrapper.fs-active .table-container {
+  flex: 1; max-height: 100%; border-radius: 0; border: none;
+  box-shadow: none;
+}
+.table-wrapper.fs-active .table-fs-bar { display: flex; }
+
+.table-fs-bar {
+  display: none; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, var(--green-800), var(--green-700));
+  color: white; padding: 10px 20px; flex-shrink: 0;
+}
+.table-fs-bar-left { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.table-fs-bar-right { display: flex; gap: 8px; }
+.btn-fs-bar {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+  color: white; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600; transition: var(--transition);
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-fs-bar:hover { background: rgba(255,255,255,0.28); }
+
+table { width: 100%; border-collapse: collapse; min-width: 3200px; }
+thead { background: linear-gradient(135deg, var(--green-800), var(--green-700)); position: sticky; top: 0; z-index: 10; }
+th { color: white; padding: 12px 10px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; border-right: 1px solid rgba(255,255,255,0.1); }
+th:last-child { border-right: none; }
+td { padding: 12px 10px; border-bottom: 1px solid var(--gray-100); font-size: 12px; vertical-align: top; max-width: 200px; word-wrap: break-word; }
+td:first-child, td:nth-child(2), td:nth-child(3) { white-space: nowrap; text-align: center; font-weight: 700; color: var(--green-700); }
+tbody tr { transition: background 0.15s ease; }
+tbody tr:hover { background: var(--green-50); }
+tbody tr:nth-child(even) { background: #FAFCFA; }
+tbody tr:nth-child(even):hover { background: var(--green-50); }
+tbody tr.row-overdue { background: #FFF8F8; }
+tbody tr.row-overdue:hover { background: #FFF0F0; }
+td a { color: var(--green-700); text-decoration: none; font-weight: 500; white-space: nowrap; }
+td a:hover { text-decoration: underline; }
+.muted { color: var(--gray-300); }
+.assigned-list { display: flex; flex-direction: column; gap: 2px; }
+.assigned-item { padding: 3px 6px; background: var(--green-50); border-left: 2px solid var(--green-400); border-radius: 3px; font-size: 11px; }
+.time-list { display: flex; flex-direction: column; gap: 2px; font-family: 'Consolas', monospace; font-size: 11px; }
+.time-item { padding: 3px 6px; background: var(--gray-50); border-radius: 3px; color: var(--gray-700); }
+.deadline-cell { white-space: nowrap; font-weight: 600; }
+.deadline-cell.overdue-deadline { color: var(--red-700); }
+.deadline-cell.upcoming-deadline { color: var(--orange-700); }
+.deadline-cell.safe-deadline { color: var(--green-700); }
+
+.badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+.badge-not-started { background: #FFEBEE; color: #C62828; }
+.badge-in-progress { background: #FFF3E0; color: #E65100; }
+.badge-completed { background: #E8F5E9; color: #2E7D32; }
+.badge-pending { background: #FFF3E0; color: #E65100; }
+.badge-under-review { background: #E3F2FD; color: #1565C0; }
+.badge-approved { background: #E8F5E9; color: #2E7D32; }
+.badge-revisions-needed { background: #FFEBEE; color: #C62828; }
+.badge-approved-with-revisions { background: #F3E5F5; color: #7B1FA2; }
+
+.action-btn { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: 600; transition: var(--transition); margin-right: 2px; white-space: nowrap; }
+.action-edit { background: var(--green-100); color: var(--green-700); }
+.action-edit:hover { background: var(--green-200); }
+.action-delete { background: #FFEBEE; color: #C62828; }
+.action-delete:hover { background: #FFCDD2; }
+.action-move { background: #E3F2FD; color: #1565C0; }
+.action-move:hover { background: #BBDEFB; }
+
+td.custom-cell { cursor: text; outline: none; min-width: 80px; transition: background 0.15s ease, box-shadow 0.15s ease; }
+td.custom-cell:hover { background: #FFFDE7 !important; box-shadow: inset 0 0 0 2px #FFF59D; }
+td.custom-cell:focus { background: #FFFDE7 !important; box-shadow: inset 0 0 0 2px var(--green-400); }
+td.custom-cell:empty::before { content: '—'; color: var(--gray-300); }
+
+/* ============ MODAL ============ */
+.modal { display: none; position: fixed; inset: 0; background: rgba(13,59,26,0.5); backdrop-filter: blur(4px); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+.modal.active { display: flex; animation: modalFade 0.25s ease; }
+@keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+.modal-content { background: white; border-radius: 16px; width: 100%; max-width: 860px; max-height: 92vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: modalSlide 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes modalSlide { from { opacity: 0; transform: translateY(30px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.modal-header { background: linear-gradient(135deg, var(--green-800), var(--green-600)); color: white; padding: 18px 24px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 5; }
+.modal-header h2 { font-size: 18px; font-weight: 600; }
+.modal-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+.modal-close:hover { background: rgba(255,255,255,0.3); transform: rotate(90deg); }
+.modal-body { padding: 24px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-group label { font-size: 11px; font-weight: 700; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select, .form-group textarea { padding: 10px 14px; border: 2px solid var(--gray-200); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--gray-50); transition: var(--transition); }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--green-500); background: white; box-shadow: 0 0 0 3px rgba(67,160,71,0.1); }
+.form-group textarea { resize: vertical; min-height: 70px; }
+
+.transcriber-section { background: var(--green-50); border: 1px solid var(--green-200); border-radius: 12px; padding: 16px; grid-column: 1 / -1; }
+.transcriber-section h3 { font-size: 13px; color: var(--green-800); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+.transcriber-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1.4fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.transcriber-row input { padding: 8px 12px; border: 2px solid var(--gray-200); border-radius: 6px; font-size: 13px; background: white; font-family: inherit; transition: var(--transition); }
+.transcriber-row input:focus { outline: none; border-color: var(--green-500); box-shadow: 0 0 0 2px rgba(67,160,71,0.1); }
+.transcriber-row .t-time { font-family: 'Consolas', monospace; font-size: 12px; }
+.btn-add-transcriber { background: var(--green-100); color: var(--green-700); border: 1px dashed var(--green-400); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: var(--transition); }
+.btn-add-transcriber:hover { background: var(--green-200); }
+.btn-remove { background: #FFEBEE; color: #C62828; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px; transition: var(--transition); font-weight: bold; }
+.btn-remove:hover { background: #FFCDD2; }
+.transcriber-hint { font-size: 11px; color: var(--gray-500); margin-top: 8px; padding: 8px 10px; background: white; border-radius: 6px; border-left: 3px solid var(--green-400); }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 10px; background: var(--gray-50); border-radius: 0 0 16px 16px; position: sticky; bottom: 0; }
+
+/* ============ SETTINGS ============ */
+.settings-tabs { display: flex; border-bottom: 2px solid var(--gray-200); margin-bottom: 20px; gap: 4px; flex-wrap: wrap; }
+.settings-tab { padding: 11px 18px; background: none; border: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--gray-500); transition: var(--transition); border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 6px 6px 0 0; }
+.settings-tab.active { color: var(--green-700); border-bottom-color: var(--green-600); }
+.settings-tab:hover { color: var(--green-600); background: var(--green-50); }
+.settings-panel { display: none; }
+.settings-panel.active { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.transcriber-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.transcriber-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; transition: var(--transition); }
+.transcriber-item:hover { border-color: var(--green-300); }
+.transcriber-item input { flex: 1; padding: 7px 12px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 14px; background: white; font-family: inherit; }
+.transcriber-item input:focus { outline: none; border-color: var(--green-500); }
+.transcriber-number { width: 28px; height: 28px; border-radius: 50%; background: var(--green-100); color: var(--green-700); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.report-info { background: var(--green-50); border: 1px solid var(--green-200); border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: var(--gray-700); }
+.report-info strong { color: var(--green-800); }
+
+.backup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.backup-card {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  background: white;
+}
+.backup-card.export-card { background: var(--green-50); border-color: var(--green-200); }
+.backup-card.import-card { background: #FFF3E0; border-color: #FFE0B2; }
+.backup-card h4 { font-size: 14px; margin-bottom: 8px; }
+.backup-card p { font-size: 12px; color: var(--gray-700); margin-bottom: 12px; }
+.backup-card .btn { width: 100%; margin-top: 4px; }
+.backup-card .btn + .btn { margin-top: 8px; }
+.warning-box {
+  margin-top: 20px;
+  padding: 16px;
+  background: #FFEBEE;
+  border-radius: 10px;
+  border: 1px solid #FFCDD2;
+}
+.warning-box p {
+  font-size: 12px;
+  color: #C62828;
+  margin: 0;
+}
+
+/* ============ TOAST ============ */
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 22px; border-radius: 10px; color: white; font-size: 14px; font-weight: 500; z-index: 1000; box-shadow: 0 8px 24px rgba(0,0,0,0.2); animation: toastIn 0.3s ease; display: flex; align-items: center; gap: 10px; max-width: 400px; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.toast.success { background: linear-gradient(135deg, var(--green-600), var(--green-500)); }
+.toast.error { background: linear-gradient(135deg, #D32F2F, #E53935); }
+.toast.info { background: linear-gradient(135deg, #1976D2, #2196F3); }
+.toast-icon { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+
+.empty-state { padding: 60px 20px; text-align: center; color: var(--gray-500); }
+.empty-state-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.4; }
+.empty-state h3 { color: var(--gray-700); margin-bottom: 6px; font-size: 16px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--gray-100); }
+::-webkit-scrollbar-thumb { background: var(--green-300); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--green-400); }
+
+@media print {
+  .app-header, .stats, .toolbar, .action-btn, .modal, .overdue-panel, .table-fs-bar { display: none !important; }
+  body { background: white; }
+  .table-wrapper { margin: 0; }
+  .table-container { box-shadow: none; max-height: none; overflow: visible; border: none; }
+}
+@media (max-width: 768px) {
+  .header-left { padding: 12px 16px; gap: 12px; }
+  .header-seal, .header-seal-placeholder { width: 44px; height: 44px; }
+  .app-header h1 { font-size: 18px; }
+  .app-header .subtitle { font-size: 9px; letter-spacing: 0.5px; }
+  .header-right { padding: 12px 16px; gap: 6px; }
+  .btn-icon { padding: 8px 12px; font-size: 12px; }
+  .stats { padding: 16px; grid-template-columns: 1fr 1fr; }
+  .toolbar { padding: 12px 16px; }
+  .table-wrapper { margin: 0 16px 16px; }
+  .table-container { max-height: calc(100vh - 420px); }
+  .overdue-panel { margin: 12px 16px 0; }
+  .form-grid { grid-template-columns: 1fr; }
+  .login-card { padding: 36px 24px; }
+  .transcriber-row { grid-template-columns: 1fr 1fr; }
+  .overdue-item { flex-direction: column; gap: 8px; }
+  .overdue-days-badge { align-self: flex-start; }
+  .backup-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-orb login-orb-1"></div>
+  <div class="login-orb login-orb-2"></div>
+  <div class="login-card">
+    <div class="seal-container">
+      <img src="seal.png" alt="Official Seal" class="seal" onerror="this.outerHTML='<div class=\'seal-placeholder\'>RALD</div>'">
+    </div>
+    <h1>RALD Transcript Tracker System</h1>
+    <p class="subtitle">Revenues, Audit, and Legislation Division</p>
+    <form onsubmit="return login(event)">
+      <input type="password" id="passwordInput" placeholder="Enter Administrator Password" required autofocus>
+      <p class="login-error" id="loginError">Incorrect password. Please try again.</p>
+      <button type="submit">🔒 Enter System</button>
+    </form>
+    <p class="login-hint">Default password: <strong>rald123</strong></p>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="app" id="mainApp" style="display:none;">
+  <header class="app-header">
+    <div class="header-left">
+      <img src="seal.png" alt="Seal" class="header-seal" onerror="this.outerHTML='<div class=\'header-seal-placeholder\'>RALD</div>'">
+      <div class="header-titles">
+        <h1>RALD Transcript Tracker System</h1>
+        <p class="subtitle">Revenues, Audit, and Legislation Division</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="btn-icon" onclick="openSettings()">⚙ Settings</button>
+      <button class="btn-icon" onclick="logout()">⏻ Logout</button>
+    </div>
+  </header>
+  
+  <section class="stats" id="statsContainer"></section>
+  
+  <!-- ============ OVERDUE DETAIL PANEL ============ -->
+  <section class="overdue-panel" id="overduePanel" style="display:none;">
+    <div class="overdue-header" onclick="toggleOverduePanel()">
+      <div class="overdue-header-left">
+        <span class="overdue-pulse-dot"></span>
+        <span class="overdue-title">⚠ Overdue Submissions</span>
+        <span class="overdue-count-badge" id="overdueCountBadge">0</span>
+      </div>
+      <span class="overdue-chevron" id="overdueChevron">▼</span>
+    </div>
+    <div class="overdue-body" id="overdueBody">
+      <div class="overdue-grid" id="overdueGrid"></div>
+    </div>
+  </section>
+  
+  <section class="toolbar">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search by committee, activity, venue, transcriber, reviewer..." oninput="renderTable()">
+    </div>
+    <select class="filter-select" id="filterStatus" onchange="renderTable()">
+      <option value="">All Status</option>
+      <option value="Not Started">Not Started</option>
+      <option value="In Progress">In Progress</option>
+      <option value="Completed">Completed</option>
+    </select>
+    <select class="filter-select" id="filterReview" onchange="renderTable()">
+      <option value="">All Review Status</option>
+      <option value="Pending">Pending</option>
+      <option value="Under Review">Under Review</option>
+      <option value="Approved">Approved</option>
+      <option value="Revisions Needed">Revisions Needed</option>
+      <option value="Approved with Revisions">Approved with Revisions</option>
+    </select>
+    <button class="btn-secondary" onclick="openColumnsModal()">▦ Columns</button>
+    <button class="btn-secondary" onclick="exportCSV(false)">⬇ Export CSV</button>
+    <button class="btn-secondary" onclick="exportCSV(true)">💾 Backup</button>
+    <button class="btn-secondary" onclick="importData()">📂 Restore</button>
+    <button class="btn-primary" onclick="openAddModal()">+ New Activity</button>
+  </section>
+  
+  <!-- ============ TABLE WRAPPER ============ -->
+  <div class="table-wrapper" id="tableWrapper">
+    <div class="table-fs-bar">
+      <div class="table-fs-bar-left">
+        <span>📋 Data Table</span>
+        <span style="opacity:0.6; font-weight:400; font-size:12px;" id="fsEntryCount"></span>
+      </div>
+      <div class="table-fs-bar-right">
+        <button class="btn-fs-bar" onclick="exportCSV(false)">⬇ Export</button>
+        <button class="btn-fs-bar" onclick="toggleFullscreen('tableWrapper')">✕ Close Fullscreen</button>
+      </div>
+    </div>
+    <div class="table-container" id="tableContainer">
+      <table id="dataTable">
+        <thead>
+          <tr id="tableHeadRow">
+            <th style="width:30px;">#</th>
+            <th style="width:30px; text-align:center;">⠿</th>
+            <!-- data-driven columns injected here by renderColumnHeaders() -->
+            <th style="width:150px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ADD/EDIT MODAL ============ -->
+<div class="modal" id="editModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">New Activity</h2>
+      <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="entryForm" onsubmit="return saveEntry(event)">
+        <input type="hidden" id="entryId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="f_date" required>
+          </div>
+          <div class="form-group">
+            <label>Deadline</label>
+            <input type="date" id="f_deadline" required>
+          </div>
+          <div class="form-group">
+            <label>Committee</label>
+            <input type="text" id="f_committee" placeholder="e.g., Finance, Health, Education" required>
+          </div>
+          <div class="form-group full">
+            <label>Activity Title</label>
+            <input type="text" id="f_activity" placeholder="e.g., Public Hearing on Budget Proposal" required>
+          </div>
+          <div class="form-group">
+            <label>Venue</label>
+            <input type="text" id="f_venue" placeholder="e.g., Session Hall A">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="f_status">
+              <option value="Not Started">Not Started</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Video Link</label>
+            <input type="url" id="f_video" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label>Goodtape Generated File Link</label>
+            <input type="url" id="f_goodtape" placeholder="https://...">
+          </div>
+          
+          <div class="transcriber-section">
+            <h3>
+              <span>👥 Assigned Transcribers & Portions</span>
+              <button type="button" class="btn-add-transcriber" onclick="addTranscriberRow()">+ Add Transcriber</button>
+            </h3>
+            <div id="transcriberRows"></div>
+            <div class="transcriber-hint">
+              <strong>Note:</strong> Names appear in "Assigned Persons". Time ranges in "Assigned Time". Submission Dates/Links in "Date of Submission".<br>
+              Time Format: 00:00:01-00:20:00, 00:20:00-00:40:00, etc.
+            </div>
+          </div>
+          
+          <div class="form-group full">
+            <label>Draft Transcripts Link (Combined)</label>
+            <input type="url" id="f_draftLink" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label>Reviewer</label>
+            <input type="text" id="f_reviewer" placeholder="Reviewer name">
+          </div>
+          <div class="form-group">
+            <label>Review Status</label>
+            <select id="f_reviewStatus">
+              <option value="Pending">Pending</option>
+              <option value="Under Review">Under Review</option>
+              <option value="Approved">Approved</option>
+              <option value="Revisions Needed">Revisions Needed</option>
+              <option value="Approved with Revisions">Approved with Revisions</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Reviewed Submitted Date</label>
+            <input type="date" id="f_reviewedDate">
+          </div>
+          <div class="form-group">
+            <label>Reviewed Transcript Link</label>
+            <input type="url" id="f_reviewedLink" placeholder="https://...">
+          </div>
+          <div class="form-group full">
+            <label>Remarks</label>
+            <textarea id="f_remarks" placeholder="Additional notes or comments..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+          <button type="submit" class="btn-primary">💾 Save Activity</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal" id="settingsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>⚙ Settings</h2>
+      <button class="modal-close" onclick="closeModal('settingsModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-tabs">
+        <button class="settings-tab active" onclick="switchTab('password', this)">🔐 Change Password</button>
+        <button class="settings-tab" onclick="switchTab('transcribers', this)">👥 Manage Transcribers</button>
+        <button class="settings-tab" onclick="switchTab('report', this)">📊 Generate Report</button>
+        <button class="settings-tab" onclick="switchTab('backup', this)">💾 Backup & Restore</button>
+      </div>
+      
+      <div class="settings-panel active" id="panel-password">
+        <form onsubmit="return changePassword(event)">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Current Password</label>
+              <input type="password" id="currentPassword" required>
+            </div>
+            <div class="form-group">
+              <label>New Password</label>
+              <input type="password" id="newPassword" required minlength="4">
+            </div>
+            <div class="form-group">
+              <label>Confirm New Password</label>
+              <input type="password" id="confirmPassword" required minlength="4">
+            </div>
+          </div>
+          <div class="modal-footer" style="margin: 20px -24px -24px;">
+            <button type="submit" class="btn-primary">Update Password</button>
+          </div>
+        </form>
+      </div>
+      
+      <div class="settings-panel" id="panel-transcribers">
+        <p style="margin-bottom: 14px; color: var(--gray-700); font-size: 13px;">
+          Add, edit, or remove transcribers available for assignment.
+        </p>
+        <div class="transcriber-list" id="transcriberList"></div>
+        <div style="margin-top: 14px; display: flex; gap: 10px;">
+          <button class="btn-secondary" onclick="addTranscriberToList()">+ Add New Transcriber</button>
+        </div>
+        <div class="modal-footer" style="margin: 20px -24px -24px;">
+          <button class="btn-secondary" onclick="closeModal('settingsModal')">Cancel</button>
+          <button class="btn-primary" onclick="saveTranscribers()">💾 Save Transcribers</button>
+        </div>
+      </div>
+      
+      <div class="settings-panel" id="panel-report">
+        <div class="report-info">
+          <strong>📊 Report Generation</strong><br>
+          Generate a printable report or download a CSV file of all transcript activities within a selected date range.
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>From Date</label>
+            <input type="date" id="reportFrom">
+          </div>
+          <div class="form-group">
+            <label>To Date</label>
+            <input type="date" id="reportTo">
+          </div>
+        </div>
+        <div class="modal-footer" style="margin: 20px -24px -24px;">
+          <button class="btn-secondary" onclick="generateReport('print')">🖨 Print Report</button>
+          <button class="btn-primary" onclick="generateReport('csv')">⬇ Download CSV</button>
+        </div>
+      </div>
+      
+      <div class="settings-panel" id="panel-backup">
+        <div class="report-info" style="background: #E3F2FD; border-color: #90CAF9;">
+          <strong>💾 Backup & Restore</strong><br>
+          Export your data for safekeeping or import previously backed up data.
+          <span id="backupInfo" style="display:block; margin-top:8px; font-size:12px; color:var(--gray-700);"></span>
+        </div>
+        
+        <div class="backup-grid">
+          <div class="backup-card export-card">
+            <h4 style="color: var(--green-800);">📤 Export Backup</h4>
+            <p>Create a complete backup of all data including transcribers and settings.</p>
+            <button class="btn-primary" onclick="exportCSV(true)" style="width:100%;">
+              💾 Export Full Backup (JSON)
+            </button>
+            <button class="btn-secondary" onclick="exportCSV(false)" style="width:100%; margin-top:8px;">
+              📄 Export CSV (Spreadsheet)
+            </button>
+          </div>
+          
+          <div class="backup-card import-card">
+            <h4 style="color: #E65100;">📥 Import Backup</h4>
+            <p>Restore from a backup file (JSON) or import CSV data.</p>
+            <button class="btn-primary" onclick="importData()" style="width:100%; background: linear-gradient(135deg, #E65100, #F57C00);">
+              📂 Import Data
+            </button>
+            <p style="font-size:11px; color:var(--gray-500); margin-top:8px; text-align:center;">
+              Supports .json (full backup) and .csv files
+            </p>
+          </div>
+        </div>
+        
+        <div class="warning-box">
+          <p>⚠️ <strong>Warning:</strong> Importing will replace or append your current data. 
+          Always export a backup before importing to avoid data loss.</p>
+        </div>
+        
+        <div class="modal-footer" style="margin: 20px -24px -24px;">
+          <button class="btn-secondary" onclick="closeModal('settingsModal')">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ COLUMNS MANAGER MODAL ============ -->
+<div class="modal" id="columnsModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>▦ Manage Columns</h2>
+      <button class="modal-close" onclick="closeModal('columnsModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 14px; color: var(--gray-700); font-size: 13px;">
+        Add custom columns to the table, rename them, or remove them. Custom columns appear after the built-in columns and are editable per activity.
+      </p>
+      <div class="transcriber-list" id="customColumnsList" style="max-height:none;"></div>
+      <div style="margin-top: 14px; display: flex; gap: 10px;">
+        <button class="btn-secondary" onclick="addColumnToList()">+ Add New Column</button>
+      </div>
+      <div class="modal-footer" style="margin: 20px -24px -24px;">
+        <button class="btn-secondary" onclick="closeModal('columnsModal')">Cancel</button>
+        <button class="btn-primary" onclick="saveCustomColumns()">💾 Save Columns</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Datalist for transcriber autocomplete -->
+<datalist id="transcriberListData"></datalist>
+
+<script>
+// ============ FIREBASE CONFIG ============
+const firebaseConfig = {
+  apiKey: "AIzaSyB2-4T0utRwjvBaGDJX_h4M0DvsQixfAV4",
+  authDomain: "rald-tracker-2026-pcss.firebaseapp.com",
+  databaseURL: "https://rald-tracker-2026-pcss-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rald-tracker-2026-pcss",
+  storageBucket: "rald-tracker-2026-pcss.firebasestorage.app",
+  messagingSenderId: "445768759060",
+  appId: "1:445768759060:web:3c4f4813b450cdb4fef401",
+  measurementId: "G-L88JSLK55H"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ============ GLOBAL STATE ============
+let appData = [];
+let transcribers = [];
+let adminPassword = 'rald123';
+let editingId = null;
+let activeStatFilter = null;
+let overduePanelOpen = true;
+let sortableInstance = null;
+let isDataLoaded = false;
+
+// Column definitions
+const DEFAULT_TABLE_COLUMNS = [
+  { key: 'date',        label: 'Date',             builtin: true, type: 'date' },
+  { key: 'deadline',    label: 'Deadline',         builtin: true, type: 'date' },
+  { key: 'committee',   label: 'Committee',        builtin: true, type: 'text' },
+  { key: 'activity',    label: 'Activity Title',   builtin: true, type: 'text' },
+  { key: 'venue',       label: 'Venue',            builtin: true, type: 'text' },
+  { key: 'video',       label: 'Video',            builtin: true, type: 'link' },
+  { key: 'goodtape',    label: 'Goodtape',         builtin: true, type: 'link' },
+  { key: 'persons',     label: 'Assigned Persons', builtin: true, type: 'persons' },
+  { key: 'times',       label: 'Assigned Time',    builtin: true, type: 'times' },
+  { key: 'status',      label: 'Status',           builtin: true, type: 'status' },
+  { key: 'submissions', label: 'Submission',       builtin: true, type: 'submissions' },
+  { key: 'draftLink',   label: 'Draft',            builtin: true, type: 'link' },
+  { key: 'reviewer',    label: 'Reviewer',         builtin: true, type: 'text' },
+  { key: 'reviewStatus',label: 'Review Status',    builtin: true, type: 'review' },
+  { key: 'reviewedDate',label: 'Reviewed Date',    builtin: true, type: 'date' },
+  { key: 'reviewedLink',label: 'Final Link',       builtin: true, type: 'link' },
+  { key: 'remarks',     label: 'Remarks',          builtin: true, type: 'text' }
+];
+let tableColumns = JSON.parse(JSON.stringify(DEFAULT_TABLE_COLUMNS));
+
+// ============ FIREBASE READ/WRITE ============
+function loadStateFromFirebase() {
+  db.ref('/').on('value', snapshot => {
+    const data = snapshot.val() || {};
+    if (!data.activities && !data.transcribers) {
+      seedDefaultData();
+      return;
+    }
+    appData = data.activities || [];
+    transcribers = data.transcribers || [];
+    tableColumns = data.columns || JSON.parse(JSON.stringify(DEFAULT_TABLE_COLUMNS));
+    adminPassword = data.password || 'rald123';
+    if (data.order) {
+      appData._order = data.order;
+    } else {
+      appData._order = appData.map(a => a.id);
+    }
+    if (isDataLoaded) {
+      renderStats();
+      renderOverduePanel();
+      renderTable();
+      updateBackupInfo();
+    } else {
+      isDataLoaded = true;
+      initApp();
+    }
+  });
+}
+
+function saveStateToFirebase() {
+  const payload = {
+    activities: appData,
+    transcribers: transcribers,
+    columns: tableColumns,
+    password: adminPassword,
+    order: appData._order || []
+  };
+  db.ref('/').set(payload).catch(err => {
+    showToast('Failed to save data to server!', 'error');
+    console.error(err);
+  });
+}
+
+function seedDefaultData() {
+  appData = [
+    {
+      id: 'sample1', date: '2024-12-15', deadline: '2024-12-19', committee: 'Finance',
+      activity: 'Public Hearing on 2025 Annual Budget Proposal', venue: 'Session Hall A',
+      video: 'https://example.com/video1', goodtape: 'https://example.com/goodtape1',
+      assignedTranscribers: [
+        { name: 'Transcriber 1', time: '00:00:01-00:30:00', subDate: '2024-12-17', subLink: 'https://example.com/sub1' },
+        { name: 'Transcriber 2', time: '00:30:00-01:00:00', subDate: '2024-12-17', subLink: 'https://example.com/sub2' },
+        { name: 'Transcriber 3', time: '01:00:00-01:35:42', subDate: '2024-12-18', subLink: 'https://example.com/sub3' }
+      ],
+      status: 'Completed', draftLink: 'https://example.com/draft1',
+      reviewer: 'Maria Santos', reviewStatus: 'Approved', reviewedDate: '2024-12-20',
+      reviewedLink: 'https://example.com/final1', remarks: 'Budget hearing transcript completed and approved.'
+    },
+    {
+      id: 'sample2', date: '2024-12-18', deadline: '2024-12-22', committee: 'Health',
+      activity: 'Committee Hearing on Healthcare Reform Bill', venue: 'Conference Room B',
+      video: 'https://example.com/video2', goodtape: 'https://example.com/goodtape2',
+      assignedTranscribers: [
+        { name: 'Transcriber 1', time: '00:00:01-00:25:00', subDate: '', subLink: '' },
+        { name: 'Transcriber 2', time: '00:25:00-00:52:18', subDate: '', subLink: '' }
+      ],
+      status: 'In Progress', draftLink: '',
+      reviewer: 'Juan Cruz', reviewStatus: 'Pending', reviewedDate: '', reviewedLink: '',
+      remarks: 'Currently being transcribed by assigned team.'
+    },
+    {
+      id: 'sample3', date: '2024-12-10', deadline: '2024-12-14', committee: 'Education',
+      activity: 'Oversight Hearing on Public School Funding', venue: 'Session Hall B',
+      video: 'https://example.com/video3', goodtape: 'https://example.com/goodtape3',
+      assignedTranscribers: [
+        { name: 'Transcriber 4', time: '00:00:01-00:45:00', subDate: '2024-12-13', subLink: 'https://example.com/sub4' },
+        { name: 'Transcriber 5', time: '00:45:00-01:22:10', subDate: '', subLink: '' }
+      ],
+      status: 'In Progress', draftLink: '',
+      reviewer: 'Maria Santos', reviewStatus: 'Pending', reviewedDate: '', reviewedLink: '',
+      remarks: 'One transcriber submitted, reviewer not yet started.'
+    }
+  ];
+  appData._order = appData.map(a => a.id);
+  transcribers = ['Transcriber 1', 'Transcriber 2', 'Transcriber 3', 'Transcriber 4', 'Transcriber 5'];
+  adminPassword = 'rald123';
+  tableColumns = JSON.parse(JSON.stringify(DEFAULT_TABLE_COLUMNS));
+  saveStateToFirebase();
+  isDataLoaded = true;
+  initApp();
+}
+
+function saveState() {
+  saveStateToFirebase();
+  updateBackupInfo();
+}
+
+// ============ UTILITY FUNCTIONS ============
+function formatDate(d) {
+  if (!d) return '<span class="muted">—</span>';
+  const date = new Date(d + 'T00:00:00');
+  if (isNaN(date)) return d;
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${message}</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(20px)';
+    toast.style.transition = 'all 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+function updateTranscriberDatalist() {
+  const dl = document.getElementById('transcriberListData');
+  dl.innerHTML = transcribers.map(t => `<option value="${escapeHtml(t)}">`).join('');
+}
+
+function updateBackupInfo() {
+  const info = document.getElementById('backupInfo');
+  if (info) {
+    const total = appData.length;
+    const transCount = transcribers.length;
+    info.innerHTML = `📊 ${total} activities, ${transCount} transcribers | Data stored in Firebase (live sync)`;
+  }
+}
+
+// ============ FULLSCREEN TOGGLE ============
+function toggleFullscreen(elementId) {
+  const el = document.getElementById(elementId);
+  const isFs = el.classList.contains('fs-active');
+  document.querySelectorAll('.fs-active').forEach(other => {
+    if (other.id !== elementId) other.classList.remove('fs-active');
+  });
+  if (isFs) {
+    el.classList.remove('fs-active');
+  } else {
+    el.classList.add('fs-active');
+    if (elementId === 'tableWrapper') {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const count = appData.filter(a => {
+        const allPersons = (a.assignedTranscribers || []).map(t => t.name).join(' ').toLowerCase();
+        return !search || (a.committee||'').toLowerCase().includes(search) || (a.activity||'').toLowerCase().includes(search) || (a.venue||'').toLowerCase().includes(search) || allPersons.includes(search) || (a.reviewer||'').toLowerCase().includes(search);
+      }).length;
+      document.getElementById('fsEntryCount').textContent = count + ' entries shown';
+    }
+    if (elementId === 'tableWrapper') {
+      document.getElementById('tableContainer').scrollTop = 0;
+    }
+    if (elementId === 'overduePanel') {
+      document.getElementById('overdueBody').scrollTop = 0;
+    }
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.fs-active').forEach(el => el.classList.remove('fs-active'));
+  }
+  if (e.key === 'F11') {
+    e.preventDefault();
+    toggleFullscreen('tableWrapper');
+  }
+});
+
+// ============ LOGIN ============
+function login(e) {
+  e.preventDefault();
+  const password = document.getElementById('passwordInput').value;
+  const errorEl = document.getElementById('loginError');
+  if (password === adminPassword) {
+    sessionStorage.setItem('raldLoggedIn', 'true');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    initApp();
+    showToast('Welcome to RALD Transcript Tracker System', 'success');
+  } else {
+    errorEl.style.display = 'block';
+    document.getElementById('passwordInput').value = '';
+    setTimeout(() => { errorEl.style.display = 'none'; }, 3000);
+  }
+  return false;
+}
+
+function logout() {
+  if (confirm('Are you sure you want to log out?')) {
+    sessionStorage.removeItem('raldLoggedIn');
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('passwordInput').focus();
+  }
+}
+
+// ============ APP INIT ============
+function initApp() {
+  updateTranscriberDatalist();
+  renderColumnHeaders();
+  renderStats();
+  renderOverduePanel();
+  renderTable();
+  updateBackupInfo();
+}
+
+// ============ COLUMN MODEL HELPERS ============
+function getVisibleColumns() {
+  return tableColumns.filter(c => !c.hidden);
+}
+
+function renderColumnHeaders() {
+  const tr = document.getElementById('tableHeadRow');
+  if (!tr) return;
+  tr.innerHTML = '';
+  const thNum = document.createElement('th'); thNum.style.width = '30px'; thNum.textContent = '#';
+  const thHandle = document.createElement('th'); thHandle.style.width = '30px'; thHandle.style.textAlign = 'center'; thHandle.textContent = '⠿';
+  tr.appendChild(thNum);
+  tr.appendChild(thHandle);
+  getVisibleColumns().forEach(col => {
+    const th = document.createElement('th');
+    th.setAttribute('data-col', col.key);
+    th.style.minWidth = '120px';
+    th.textContent = col.label;
+    tr.appendChild(th);
+  });
+  const thActions = document.createElement('th'); thActions.style.minWidth = '150px'; thActions.textContent = 'Actions';
+  tr.appendChild(thActions);
+}
+
+function colCsvHeader(col) {
+  const map = {
+    date: 'Date', deadline: 'Deadline', committee: 'Committee', activity: 'Activity Title',
+    venue: 'Venue', video: 'Video Link', goodtape: 'Goodtape Link', persons: 'Assigned Persons',
+    times: 'Assigned Time', status: 'Status', submissions: 'Submission', draftLink: 'Draft Link',
+    reviewer: 'Reviewer', reviewStatus: 'Review Status', reviewedDate: 'Reviewed Date',
+    reviewedLink: 'Reviewed Link', remarks: 'Remarks'
+  };
+  return col.builtin ? (map[col.key] || col.label) : col.label;
+}
+
+function colCsvValue(col, a) {
+  const tList = a.assignedTranscribers || [];
+  switch (col.type) {
+    case 'persons': return tList.map(t => t.name).join('; ');
+    case 'times': return tList.map(t => t.time).join('; ');
+    case 'submissions':
+      return tList.map(t => (t.subDate || '') + (t.subLink ? '|' + t.subLink : '')).join('; ');
+    default: return a[col.key] != null ? a[col.key] : '';
+  }
+}
+
+function renderCellHtml(col, a) {
+  const tList = a.assignedTranscribers || [];
+  switch (col.type) {
+    case 'date':
+      if (col.key === 'deadline') {
+        let deadlineHtml = '<span class="muted">—</span>';
+        if (a.deadline) {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const dl = new Date(a.deadline + 'T00:00:00');
+          const diffDays = Math.floor((dl - today) / (1000*60*60*24));
+          let cellClass = 'safe-deadline';
+          if (diffDays < 0) cellClass = 'overdue-deadline';
+          else if (diffDays <= 2) cellClass = 'upcoming-deadline';
+          deadlineHtml = `<span class="deadline-cell ${cellClass}">${formatDate(a.deadline)}</span>`;
+        }
+        return `<td>${deadlineHtml}</td>`;
+      }
+      return `<td>${formatDate(a[col.key])}</td>`;
+    case 'link': {
+      const linkLabel = col.key === 'video' ? 'Watch ↗'
+        : col.key === 'draftLink' ? 'Draft ↗'
+        : col.key === 'reviewedLink' ? 'Final ↗'
+        : 'Open ↗';
+      return `<td>${a[col.key] ? `<a href="${escapeHtml(a[col.key])}" target="_blank">${linkLabel}</a>` : '<span class="muted">—</span>'}</td>`;
+    }
+    case 'status': {
+      const cls = (a[col.key] || 'Not Started').toLowerCase().replace(/\s+/g, '-');
+      return `<td><span class="badge badge-${cls}">${escapeHtml(a[col.key] || 'Not Started')}</span></td>`;
+    }
+    case 'review': {
+      const cls = (a[col.key] || 'Pending').toLowerCase().replace(/\s+/g, '-');
+      return `<td><span class="badge badge-${cls}">${escapeHtml(a[col.key] || 'Pending')}</span></td>`;
+    }
+    case 'persons':
+      return `<td>${tList.length ? `<div class="assigned-list">${tList.map(t => `<div class="assigned-item">${escapeHtml(t.name)}</div>`).join('')}</div>` : '<span class="muted">—</span>'}</td>`;
+    case 'times':
+      return `<td>${tList.length ? `<div class="time-list">${tList.map(t => `<div class="time-item">${escapeHtml(t.time) || '—'}</div>`).join('')}</div>` : '<span class="muted">—</span>'}</td>`;
+    case 'submissions':
+      return `<td>${tList.length ? `<div class="assigned-list">${tList.map(t => {
+        if (!t.subDate) return '<div class="assigned-item"><span class="muted">—</span></div>';
+        if (t.subLink) return `<div class="assigned-item"><a href="${escapeHtml(t.subLink)}" target="_blank">${formatDate(t.subDate)} ↗</a></div>`;
+        return `<div class="assigned-item">${formatDate(t.subDate)}</div>`;
+      }).join('')}</div>` : '<span class="muted">—</span>'}</td>`;
+    default: {
+      if (col.builtin) {
+        const v = a[col.key] || '';
+        if (col.key === 'committee') return `<td><strong>${escapeHtml(v)}</strong></td>`;
+        return `<td>${escapeHtml(v) || '<span class="muted">—</span>'}</td>`;
+      }
+      const val = a[col.key] || '';
+      return `<td data-col-key="${col.key}" data-id="${a.id}" class="custom-cell" contenteditable="true" title="Click to edit" onblur="saveCustomCell(this)">${escapeHtml(val)}</td>`;
+    }
+  }
+}
+
+function saveCustomCell(cell) {
+  const id = cell.getAttribute('data-id');
+  const key = cell.getAttribute('data-col-key');
+  const entry = appData.find(a => a.id === id);
+  if (!entry || !key) return;
+  const oldVal = entry[key] || '';
+  const val = cell.textContent.trim();
+  if (val === oldVal) return;
+  if (val) {
+    entry[key] = val;
+  } else {
+    delete entry[key];
+  }
+  saveState();
+}
+
+// ============ MANAGE COLUMNS ============
+function openColumnsModal() {
+  renderColumnsList();
+  openModal('columnsModal');
+}
+
+function renderColumnsList() {
+  const list = document.getElementById('customColumnsList');
+  list.innerHTML = '';
+  tableColumns.forEach((col, i) => {
+    const div = document.createElement('div');
+    div.className = 'transcriber-item';
+    div.setAttribute('data-index', i);
+    const badge = col.builtin
+      ? '<span class="col-tag col-tag-builtin" title="Built-in column">built-in</span>'
+      : '<span class="col-tag col-tag-custom" title="User-added column">custom</span>';
+    const stateBtn = col.hidden
+      ? '<button type="button" class="action-btn action-edit" onclick="toggleColumnVisibility(' + i + ')" title="Show column">👁</button>'
+      : '<button type="button" class="action-btn action-move" onclick="toggleColumnVisibility(' + i + ')" title="Hide column">🙈</button>';
+    const deleteBtn = col.builtin
+      ? ''
+      : '<button type="button" class="action-btn action-delete" onclick="deleteColumn(' + i + ')" title="Delete column">🗑</button>';
+    div.innerHTML = `
+      <span class="transcriber-number">${i + 1}</span>
+      <input type="text" value="${escapeHtml(col.label)}" placeholder="Column name" data-index="${i}">
+      ${badge}
+      <span class="col-actions">${stateBtn}${deleteBtn}</span>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function toggleColumnVisibility(index) {
+  const col = tableColumns[index];
+  if (!col) return;
+  col.hidden = !col.hidden;
+  renderColumnsList();
+}
+
+function deleteColumn(index) {
+  const col = tableColumns[index];
+  if (!col || col.builtin) return;
+  if (!confirm(`Delete the "${col.label}" column? The data stored in it will be removed from all activities. This can be undone with Undo.`)) return;
+  appData.forEach(entry => { delete entry[col.key]; });
+  tableColumns.splice(index, 1);
+  saveState();
+  renderColumnsList();
+  renderColumnHeaders();
+  renderTable();
+  showToast(`Column "${col.label}" deleted`, 'info');
+}
+
+function addColumnToList() {
+  const i = tableColumns.length;
+  const newCol = {
+    key: 'col_' + Date.now() + '_' + i,
+    label: 'New Column ' + (tableColumns.filter(c => !c.builtin).length + 1),
+    builtin: false,
+    type: 'text',
+    hidden: false
+  };
+  tableColumns.push(newCol);
+  renderColumnsList();
+  const inputs = document.querySelectorAll('#customColumnsList input[type="text"]');
+  if (inputs.length) { inputs[inputs.length - 1].focus(); inputs[inputs.length - 1].select(); }
+}
+
+function saveCustomColumns() {
+  const inputs = document.querySelectorAll('#customColumnsList input[type="text"]');
+  inputs.forEach((input, i) => {
+    const label = input.value.trim();
+    if (tableColumns[i]) {
+      tableColumns[i].label = label || tableColumns[i].label || 'Untitled';
+    }
+  });
+  saveState();
+  renderColumnHeaders();
+  renderTable();
+  const visible = getVisibleColumns().length;
+  showToast(`Columns saved (${visible} visible of ${tableColumns.length} total)`, 'success');
+  closeModal('columnsModal');
+}
+
+// ============ OVERDUE LOGIC ============
+function getOverdueItems() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdue = [];
+  
+  appData.forEach(entry => {
+    if (!entry.deadline) return;
+    const deadline = new Date(entry.deadline + 'T00:00:00');
+    if (isNaN(deadline.getTime())) return;
+    if (deadline >= today) return;
+    
+    const daysOverdue = Math.floor((today - deadline) / (1000 * 60 * 60 * 24));
+    
+    if (entry.status !== 'Completed') {
+      (entry.assignedTranscribers || []).forEach(t => {
+        if (!t.subDate) {
+          overdue.push({
+            type: 'transcriber', name: t.name,
+            activity: entry.activity, committee: entry.committee,
+            deadline: entry.deadline, daysOverdue: daysOverdue, entryId: entry.id
+          });
+        }
+      });
+    }
+    
+    if (entry.reviewer && !entry.reviewedDate) {
+      if (!['Approved', 'Approved with Revisions'].includes(entry.reviewStatus)) {
+        const hasAnySubmission = (entry.assignedTranscribers || []).some(t => t.subDate) || entry.status === 'Completed';
+        if (hasAnySubmission) {
+          overdue.push({
+            type: 'reviewer', name: entry.reviewer,
+            activity: entry.activity, committee: entry.committee,
+            deadline: entry.deadline, daysOverdue: daysOverdue, entryId: entry.id
+          });
+        }
+      }
+    }
+  });
+  
+  return overdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
+}
+
+function getSeverityClass(days) {
+  if (days >= 5) return 'high';
+  if (days >= 3) return 'med';
+  return 'low';
+}
+
+function renderOverduePanel() {
+  const items = getOverdueItems();
+  const panel = document.getElementById('overduePanel');
+  const grid = document.getElementById('overdueGrid');
+  const badge = document.getElementById('overdueCountBadge');
+  
+  badge.textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
+  
+  if (items.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  
+  panel.style.display = 'block';
+  
+  grid.innerHTML = items.map(item => {
+    const sev = getSeverityClass(item.daysOverdue);
+    const roleLabel = item.type === 'transcriber' ? '📝 Transcriber' : '🔍 Reviewer';
+    const roleClass = item.type === 'transcriber' ? 'transcriber' : 'reviewer';
+    
+    return `
+      <div class="overdue-item severity-${sev}">
+        <span class="overdue-role-badge ${roleClass}">${roleLabel}</span>
+        <div class="overdue-info">
+          <div class="overdue-person-name">${escapeHtml(item.name)}</div>
+          <div class="overdue-activity-name" title="${escapeHtml(item.activity)}">${escapeHtml(item.activity)}</div>
+          <div class="overdue-meta-row">
+            <span class="overdue-meta-item">🏛️ <strong>${escapeHtml(item.committee)}</strong></span>
+            <span class="overdue-meta-item">📅 Deadline: <strong>${formatDate(item.deadline)}</strong></span>
+          </div>
+        </div>
+        <div class="overdue-days-badge ${sev}">
+          <span class="overdue-days-label">${item.daysOverdue === 1 ? 'Day' : 'Days'} Late</span>
+          ${item.daysOverdue}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleOverduePanel() {
+  overduePanelOpen = !overduePanelOpen;
+  const body = document.getElementById('overdueBody');
+  const chevron = document.getElementById('overdueChevron');
+  if (overduePanelOpen) {
+    body.classList.remove('collapsed');
+    chevron.classList.remove('collapsed');
+  } else {
+    body.classList.add('collapsed');
+    chevron.classList.add('collapsed');
+  }
+}
+
+// ============ STATS ============
+function renderStats() {
+  const total = appData.length;
+  const inProgress = appData.filter(a => a.status === 'In Progress').length;
+  const completed = appData.filter(a => a.status === 'Completed').length;
+  const pendingReview = appData.filter(a => ['Pending', 'Under Review', 'Revisions Needed'].includes(a.reviewStatus)).length;
+  const overdueCount = getOverdueItems().length;
+  
+  const stats = [
+    { id: 'total', icon: '📋', value: total, label: 'Total Activities', overdue: false },
+    { id: 'in-progress', icon: '⏳', value: inProgress, label: 'In Progress', overdue: false },
+    { id: 'completed', icon: '✓', value: completed, label: 'Completed', overdue: false },
+    { id: 'pending-review', icon: '🔎', value: pendingReview, label: 'Pending Review', overdue: false },
+    { id: 'overdue', icon: '⚠', value: overdueCount, label: 'Overdue', overdue: true }
+  ];
+  
+  document.getElementById('statsContainer').innerHTML = stats.map(s => `
+    <div class="stat-card ${s.overdue ? 'stat-card-overdue' : ''} ${activeStatFilter === s.id ? 'active' : ''}" id="stat-${s.id}" onclick="filterStat('${s.id}')">
+      <div class="stat-icon">${s.icon}</div>
+      <div class="stat-info">
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterStat(type) {
+  const statusFilter = document.getElementById('filterStatus');
+  const reviewFilter = document.getElementById('filterReview');
+  
+  if (activeStatFilter === type) {
+    activeStatFilter = null;
+  } else {
+    activeStatFilter = type;
+  }
+  
+  statusFilter.value = '';
+  reviewFilter.value = '';
+  
+  if (activeStatFilter === 'in-progress') statusFilter.value = 'In Progress';
+  else if (activeStatFilter === 'completed') statusFilter.value = 'Completed';
+  else if (activeStatFilter === 'pending-review') reviewFilter.value = 'Pending';
+  
+  renderStats();
+  renderTable();
+  
+  if (activeStatFilter === 'overdue') {
+    const panel = document.getElementById('overduePanel');
+    if (panel.style.display !== 'none') {
+      if (!overduePanelOpen) toggleOverduePanel();
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } else {
+    document.querySelector('.table-wrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ============ TABLE WITH DRAG AND DROP ============
+function isEntryOverdue(entry) {
+  if (!entry.deadline) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const deadline = new Date(entry.deadline + 'T00:00:00');
+  if (deadline >= today) return false;
+  if (entry.status === 'Completed' && ['Approved','Approved with Revisions'].includes(entry.reviewStatus)) return false;
+  return true;
+}
+
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const filterStatus = document.getElementById('filterStatus').value;
+  const filterReview = document.getElementById('filterReview').value;
+  const overdueItems = getOverdueItems();
+  const overdueEntryIds = new Set(overdueItems.map(o => o.entryId));
+  
+  let filtered = appData.filter(a => {
+    const allPersons = (a.assignedTranscribers || []).map(t => t.name).join(' ').toLowerCase();
+    const matchSearch = !search || 
+      (a.committee || '').toLowerCase().includes(search) ||
+      (a.activity || '').toLowerCase().includes(search) ||
+      (a.venue || '').toLowerCase().includes(search) ||
+      allPersons.includes(search) ||
+      (a.reviewer || '').toLowerCase().includes(search);
+    const matchStatus = !filterStatus || a.status === filterStatus;
+    const matchReview = !filterReview || a.reviewStatus === filterReview;
+    let matchOverdue = true;
+    if (activeStatFilter === 'overdue') matchOverdue = overdueEntryIds.has(a.id);
+    return matchSearch && matchStatus && matchReview && matchOverdue;
+  });
+  
+  if (appData._order && appData._order.length > 0) {
+    filtered.sort((a, b) => {
+      const posA = appData._order.indexOf(a.id);
+      const posB = appData._order.indexOf(b.id);
+      if (posA === -1 && posB === -1) return 0;
+      if (posA === -1) return 1;
+      if (posB === -1) return -1;
+      return posA - posB;
+    });
+  } else {
+    filtered.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+  
+  const tbody = document.getElementById('tableBody');
+  
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${20}"><div class="empty-state"><div class="empty-state-icon">📋</div><h3>No activities found</h3><p>Click "New Activity" to add your first transcript entry.</p></div></td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map((a, idx) => {
+    const entryOverdue = isEntryOverdue(a);
+    const visibleCols = getVisibleColumns();
+
+    return `
+      <tr data-id="${a.id}" class="${entryOverdue ? 'row-overdue' : ''}">
+        <td>${idx + 1}</td>
+        <td style="text-align:center; cursor:grab;"><span class="drag-handle">⠿</span></td>
+        ${visibleCols.map(col => renderCellHtml(col, a)).join('')}
+        <td style="white-space: nowrap;">
+          <button class="action-btn action-move" onclick="moveUp('${a.id}')" title="Move Up">⬆</button>
+          <button class="action-btn action-move" onclick="moveDown('${a.id}')" title="Move Down">⬇</button>
+          <button class="action-btn action-edit" onclick="openEditModal('${a.id}')">✎</button>
+          <button class="action-btn action-delete" onclick="deleteEntry('${a.id}')">🗑</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  initSortable();
+}
+
+function initSortable() {
+  const tbody = document.getElementById('tableBody');
+  if (!tbody) return;
+  
+  if (sortableInstance) {
+    sortableInstance.destroy();
+  }
+  
+  sortableInstance = new Sortable(tbody, {
+    handle: '.drag-handle',
+    animation: 200,
+    easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onEnd: function(evt) {
+      const rows = tbody.querySelectorAll('tr[data-id]');
+      const newOrder = [];
+      rows.forEach(row => {
+        const id = row.getAttribute('data-id');
+        if (id) newOrder.push(id);
+      });
+      
+      let fullOrder = [...newOrder];
+      appData.forEach(a => {
+        if (!fullOrder.includes(a.id)) {
+          fullOrder.push(a.id);
+        }
+      });
+      
+      appData._order = fullOrder;
+      saveState();
+      renderStats();
+      renderOverduePanel();
+      renderTable();
+      showToast('Activity order updated successfully', 'success');
+      updateBackupInfo();
+    }
+  });
+}
+
+function moveUp(id) {
+  if (!appData._order) {
+    appData._order = appData.map(a => a.id);
+  }
+  const pos = appData._order.indexOf(id);
+  if (pos > 0) {
+    [appData._order[pos-1], appData._order[pos]] = [appData._order[pos], appData._order[pos-1]];
+    saveState();
+    renderTable();
+    showToast('Activity moved up', 'success');
+  }
+}
+
+function moveDown(id) {
+  if (!appData._order) {
+    appData._order = appData.map(a => a.id);
+  }
+  const pos = appData._order.indexOf(id);
+  if (pos < appData._order.length - 1) {
+    [appData._order[pos], appData._order[pos+1]] = [appData._order[pos+1], appData._order[pos]];
+    saveState();
+    renderTable();
+    showToast('Activity moved down', 'success');
+  }
+}
+
+// ============ MODAL OPERATIONS ============
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').innerText = 'New Activity';
+  document.getElementById('entryForm').reset();
+  document.getElementById('entryId').value = '';
+  document.getElementById('transcriberRows').innerHTML = '';
+  addTranscriberRow();
+  openModal('editModal');
+}
+
+function openEditModal(id) {
+  const entry = appData.find(a => a.id === id);
+  if (!entry) return;
+  
+  editingId = id;
+  document.getElementById('modalTitle').innerText = 'Edit Activity';
+  document.getElementById('entryId').value = id;
+  
+  document.getElementById('f_date').value = entry.date || '';
+  document.getElementById('f_deadline').value = entry.deadline || '';
+  document.getElementById('f_committee').value = entry.committee || '';
+  document.getElementById('f_activity').value = entry.activity || '';
+  document.getElementById('f_venue').value = entry.venue || '';
+  document.getElementById('f_status').value = entry.status || 'Not Started';
+  document.getElementById('f_video').value = entry.video || '';
+  document.getElementById('f_goodtape').value = entry.goodtape || '';
+  document.getElementById('f_draftLink').value = entry.draftLink || '';
+  document.getElementById('f_reviewer').value = entry.reviewer || '';
+  document.getElementById('f_reviewStatus').value = entry.reviewStatus || 'Pending';
+  document.getElementById('f_reviewedDate').value = entry.reviewedDate || '';
+  document.getElementById('f_reviewedLink').value = entry.reviewedLink || '';
+  document.getElementById('f_remarks').value = entry.remarks || '';
+  
+  document.getElementById('transcriberRows').innerHTML = '';
+  if (!entry.assignedTranscribers || entry.assignedTranscribers.length === 0) {
+    addTranscriberRow();
+  } else {
+    entry.assignedTranscribers.forEach(t => addTranscriberRow(t.name, t.time, t.subDate, t.subLink));
+  }
+  
+  openModal('editModal');
+}
+
+function addTranscriberRow(name = '', time = '', subDate = '', subLink = '') {
+  const container = document.getElementById('transcriberRows');
+  const div = document.createElement('div');
+  div.className = 'transcriber-row';
+  div.innerHTML = `
+    <input type="text" class="t-name" placeholder="Transcriber Name" value="${escapeHtml(name)}" list="transcriberListData">
+    <input type="text" class="t-time" placeholder="00:00:00-00:20:00" value="${escapeHtml(time)}">
+    <input type="date" class="t-sub-date" value="${escapeHtml(subDate)}" title="Submission Date">
+    <input type="url" class="t-sub-link" placeholder="Portion Link" value="${escapeHtml(subLink)}">
+    <button type="button" class="btn-remove" onclick="this.parentElement.remove()">×</button>
+  `;
+  container.appendChild(div);
+}
+
+function saveEntry(e) {
+  e.preventDefault();
+  
+  const nameInputs = document.querySelectorAll('#transcriberRows .t-name');
+  const timeInputs = document.querySelectorAll('#transcriberRows .t-time');
+  const dateInputs = document.querySelectorAll('#transcriberRows .t-sub-date');
+  const linkInputs = document.querySelectorAll('#transcriberRows .t-sub-link');
+  
+  const assignedTranscribers = [];
+  nameInputs.forEach((input, i) => {
+    const name = input.value.trim();
+    if (name) {
+      assignedTranscribers.push({
+        name: name, time: timeInputs[i].value.trim(),
+        subDate: dateInputs[i].value, subLink: linkInputs[i].value.trim()
+      });
+    }
+  });
+  
+  const entry = {
+    id: editingId || 'entry_' + Date.now(),
+    date: document.getElementById('f_date').value,
+    deadline: document.getElementById('f_deadline').value,
+    committee: document.getElementById('f_committee').value,
+    activity: document.getElementById('f_activity').value,
+    venue: document.getElementById('f_venue').value,
+    status: document.getElementById('f_status').value,
+    video: document.getElementById('f_video').value,
+    goodtape: document.getElementById('f_goodtape').value,
+    assignedTranscribers: assignedTranscribers,
+    draftLink: document.getElementById('f_draftLink').value,
+    reviewer: document.getElementById('f_reviewer').value,
+    reviewStatus: document.getElementById('f_reviewStatus').value,
+    reviewedDate: document.getElementById('f_reviewedDate').value,
+    reviewedLink: document.getElementById('f_reviewedLink').value,
+    remarks: document.getElementById('f_remarks').value
+  };
+  
+  if (editingId) {
+    const idx = appData.findIndex(a => a.id === editingId);
+    if (idx !== -1) appData[idx] = entry;
+    showToast('Activity updated successfully', 'success');
+  } else {
+    appData.push(entry);
+    if (appData._order) {
+      appData._order.push(entry.id);
+    }
+    showToast('Activity added successfully', 'success');
+  }
+  
+  saveState();
+  renderStats();
+  renderOverduePanel();
+  renderTable();
+  updateBackupInfo();
+  closeModal('editModal');
+  return false;
+}
+
+function deleteEntry(id) {
+  if (confirm('Are you sure you want to delete this activity? This cannot be undone.')) {
+    appData = appData.filter(a => a.id !== id);
+    if (appData._order) {
+      appData._order = appData._order.filter(oid => oid !== id);
+    }
+    saveState();
+    renderStats();
+    renderOverduePanel();
+    renderTable();
+    updateBackupInfo();
+    showToast('Activity deleted', 'info');
+  }
+}
+
+// ============ SETTINGS ============
+function openSettings() { renderTranscriberList(); updateBackupInfo(); openModal('settingsModal'); }
+
+function switchTab(tabName, btn) {
+  document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + tabName).classList.add('active');
+  if (tabName === 'backup') updateBackupInfo();
+}
+
+function changePassword(e) {
+  e.preventDefault();
+  const current = document.getElementById('currentPassword').value;
+  const newPass = document.getElementById('newPassword').value;
+  const confirmPass = document.getElementById('confirmPassword').value;
+  
+  if (current !== adminPassword) { showToast('Current password is incorrect', 'error'); return false; }
+  if (newPass !== confirmPass) { showToast('New passwords do not match', 'error'); return false; }
+  
+  adminPassword = newPass;
+  saveState();
+  showToast('Password changed successfully', 'success');
+  document.getElementById('currentPassword').value = '';
+  document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
+  closeModal('settingsModal');
+  return false;
+}
+
+function renderTranscriberList() {
+  const list = document.getElementById('transcriberList');
+  list.innerHTML = '';
+  transcribers.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'transcriber-item';
+    div.innerHTML = `
+      <span class="transcriber-number">${i + 1}</span>
+      <input type="text" value="${escapeHtml(t)}" data-index="${i}">
+      <button type="button" class="btn-remove" onclick="this.parentElement.remove(); renumberTranscribers();">×</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renumberTranscribers() {
+  document.querySelectorAll('#transcriberList .transcriber-number').forEach((el, i) => {
+    el.textContent = i + 1;
+  });
+}
+
+function addTranscriberToList() {
+  const list = document.getElementById('transcriberList');
+  const i = list.children.length;
+  const div = document.createElement('div');
+  div.className = 'transcriber-item';
+  div.innerHTML = `
+    <span class="transcriber-number">${i + 1}</span>
+    <input type="text" value="" placeholder="Enter transcriber name" data-index="${i}">
+    <button type="button" class="btn-remove" onclick="this.parentElement.remove(); renumberTranscribers();">×</button>
+  `;
+  list.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function saveTranscribers() {
+  const inputs = document.querySelectorAll('#transcriberList input[type="text"]');
+  transcribers = [];
+  inputs.forEach(input => {
+    const val = input.value.trim();
+    if (val) transcribers.push(val);
+  });
+  saveState();
+  updateTranscriberDatalist();
+  showToast('Transcriber list saved (' + transcribers.length + ' members)', 'success');
+  closeModal('settingsModal');
+}
+
+// ============ EXPORT / IMPORT ============
+function exportCSV(backupMode = false) {
+  if (appData.length === 0) { 
+    showToast('No data to export', 'error'); 
+    return; 
+  }
+  
+  let filename = 'RALD_Transcript_Tracker_' + new Date().toISOString().split('T')[0];
+  
+  if (backupMode) {
+    filename += '_FULL_BACKUP';
+    const backupData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      totalRecords: appData.length,
+      transcribers: transcribers,
+      tableColumns: tableColumns,
+      password: adminPassword,
+      order: appData._order || [],
+      data: appData
+    };
+    
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ Full backup exported as JSON', 'success');
+    return;
+  }
+  
+  const visibleCols = getVisibleColumns();
+  const headers = visibleCols.map(colCsvHeader);
+
+  const rows = appData.map(a => {
+    return visibleCols.map(col => colCsvValue(col, a))
+      .map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',');
+  });
+
+  const csv = ['\uFEFF' + headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ CSV exported successfully', 'success');
+}
+
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.json';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      try {
+        const content = event.target.result;
+        if (file.name.endsWith('.json')) {
+          importFromJSON(content);
+        } else {
+          importFromCSV(content);
+        }
+      } catch (error) {
+        showToast('Error importing file: ' + error.message, 'error');
+        console.error(error);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function importFromJSON(content) {
+  try {
+    const backupData = JSON.parse(content);
+    
+    if (!backupData.data || !Array.isArray(backupData.data)) {
+      throw new Error('Invalid backup file format');
+    }
+    
+    const totalRecords = backupData.data.length;
+    const transcriberCount = backupData.transcribers ? backupData.transcribers.length : 0;
+    const exportedDate = backupData.exportedAt ? new Date(backupData.exportedAt).toLocaleString() : 'Unknown';
+    
+    if (confirm(`📋 Import Backup Summary:
+    
+📊 Total Records: ${totalRecords}
+👥 Transcribers: ${transcriberCount}
+📅 Backup Date: ${exportedDate}
+${backupData.version ? `📌 Version: ${backupData.version}` : ''}
+
+⚠️ This will REPLACE all current data!
+Are you sure you want to continue?`)) {
+      
+      appData = backupData.data;
+      
+      if (backupData.transcribers) {
+        transcribers = backupData.transcribers;
+      }
+
+      if (backupData.tableColumns) {
+        tableColumns = backupData.tableColumns;
+      } else if (backupData.customColumns) {
+        tableColumns = JSON.parse(JSON.stringify(DEFAULT_TABLE_COLUMNS));
+        backupData.customColumns.forEach(c => {
+          if (!tableColumns.some(t => t.key === c.key)) {
+            tableColumns.push({ key: c.key, label: c.label, builtin: false, type: 'text' });
+          }
+        });
+      }
+
+      if (backupData.password) {
+        adminPassword = backupData.password;
+      }
+      
+      if (backupData.order) {
+        appData._order = backupData.order;
+      }
+      
+      saveState();
+      initApp();
+      updateBackupInfo();
+      showToast(`✅ Backup restored successfully! ${totalRecords} records loaded.`, 'success');
+    }
+  } catch (error) {
+    showToast('Error importing JSON: ' + error.message, 'error');
+  }
+}
+
+function importFromCSV(content) {
+  const lines = content.split('\n').filter(line => line.trim());
+  if (lines.length < 2) {
+    showToast('CSV file is empty or invalid', 'error');
+    return;
+  }
+  
+  const header = parseCSVLine(lines[0]);
+  const expectedHeaders = ['Date', 'Deadline', 'Committee', 'Activity Title', 'Venue'];
+  const isValid = expectedHeaders.some(h => header.includes(h));
+  
+  if (!isValid) {
+    showToast('Invalid CSV format. Please export a valid CSV first.', 'error');
+    return;
+  }
+  
+  const dateIdx = header.indexOf('Date');
+  const deadlineIdx = header.indexOf('Deadline');
+  const committeeIdx = header.indexOf('Committee');
+  const activityIdx = header.indexOf('Activity Title');
+  const venueIdx = header.indexOf('Venue');
+  const videoIdx = header.indexOf('Video Link');
+  const goodtapeIdx = header.indexOf('Goodtape Link');
+  const personsIdx = header.indexOf('Assigned Persons');
+  const timeIdx = header.indexOf('Assigned Time');
+  const statusIdx = header.indexOf('Status');
+  const subDatesIdx = header.indexOf('Submission Dates');
+  const subLinksIdx = header.indexOf('Submission Links');
+  const draftIdx = header.indexOf('Draft Link');
+  const reviewerIdx = header.indexOf('Reviewer');
+  const reviewStatusIdx = header.indexOf('Review Status');
+  const reviewedDateIdx = header.indexOf('Reviewed Date');
+  const reviewedLinkIdx = header.indexOf('Reviewed Link');
+  const remarksIdx = header.indexOf('Remarks');
+  
+  const importedData = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]);
+    if (row.length < 2) continue;
+    
+    const persons = row[personsIdx] ? row[personsIdx].split(';').map(s => s.trim()).filter(Boolean) : [];
+    const times = row[timeIdx] ? row[timeIdx].split(';').map(s => s.trim()).filter(Boolean) : [];
+    const subDates = row[subDatesIdx] ? row[subDatesIdx].split(';').map(s => s.trim()).filter(Boolean) : [];
+    const subLinks = row[subLinksIdx] ? row[subLinksIdx].split(';').map(s => s.trim()).filter(Boolean) : [];
+    
+    const assignedTranscribers = persons.map((name, idx) => ({
+      name: name,
+      time: times[idx] || '',
+      subDate: subDates[idx] || '',
+      subLink: subLinks[idx] || ''
+    }));
+    
+    const entry = {
+      id: 'import_' + Date.now() + '_' + i,
+      date: row[dateIdx] || '',
+      deadline: row[deadlineIdx] || '',
+      committee: row[committeeIdx] || '',
+      activity: row[activityIdx] || '',
+      venue: row[venueIdx] || '',
+      video: row[videoIdx] || '',
+      goodtape: row[goodtapeIdx] || '',
+      assignedTranscribers: assignedTranscribers,
+      status: row[statusIdx] || 'Not Started',
+      draftLink: row[draftIdx] || '',
+      reviewer: row[reviewerIdx] || '',
+      reviewStatus: row[reviewStatusIdx] || 'Pending',
+      reviewedDate: row[reviewedDateIdx] || '',
+      reviewedLink: row[reviewedLinkIdx] || '',
+      remarks: row[remarksIdx] || ''
+    };
+
+    if (remarksIdx !== -1 && remarksIdx < header.length - 1) {
+      const extraLabels = header.slice(remarksIdx + 1);
+      extraLabels.forEach((label, ei) => {
+        const trimmed = (label || '').trim();
+        if (!trimmed) return;
+        let col = tableColumns.find(c => !c.builtin && c.label === trimmed);
+        if (!col) {
+          col = { key: 'col_import_' + Date.now() + '_' + ei, label: trimmed, builtin: false, type: 'text' };
+          tableColumns.push(col);
+        }
+        entry[col.key] = row[remarksIdx + 1 + ei] || '';
+      });
+    }
+
+    importedData.push(entry);
+  }
+  
+  if (importedData.length === 0) {
+    showToast('No valid data found in CSV', 'error');
+    return;
+  }
+  
+  const choice = confirm(`📥 Import ${importedData.length} records?
+
+Choose:
+• Click "OK" to APPEND to existing data (${appData.length} existing records)
+• Click "Cancel" to REPLACE all current data`);
+
+  if (choice) {
+    appData = appData.concat(importedData);
+    if (appData._order) {
+      importedData.forEach(a => appData._order.push(a.id));
+    }
+    showToast(`✅ ${importedData.length} records appended successfully! Total: ${appData.length}`, 'success');
+  } else {
+    if (confirm(`⚠️ This will REPLACE all ${appData.length} existing records. Continue?`)) {
+      appData = importedData;
+      if (appData._order) {
+        appData._order = importedData.map(a => a.id);
+      }
+      showToast(`✅ ${importedData.length} records imported (replaced all data)`, 'success');
+    } else {
+      showToast('Import cancelled', 'info');
+      return;
+    }
+  }
+  
+  saveState();
+  initApp();
+  updateBackupInfo();
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+// ============ REPORT ============
+function generateReport(mode) {
+  const from = document.getElementById('reportFrom').value;
+  const to = document.getElementById('reportTo').value;
+  
+  let data = appData;
+  if (from) data = data.filter(a => a.date >= from);
+  if (to) data = data.filter(a => a.date <= to);
+  
+  if (data.length === 0) { showToast('No data found for the selected date range', 'error'); return; }
+  
+  if (mode === 'csv') {
+    const headers = ['Date', 'Deadline', 'Committee', 'Activity', 'Venue', 'Transcribers', 'Status', 'Submission Dates', 'Reviewer', 'Review Status', 'Reviewed Date', 'Remarks'];
+    const rows = data.map(a => {
+      const tList = a.assignedTranscribers || [];
+      return [
+        a.date, a.deadline, a.committee, a.activity, a.venue,
+        tList.map(t => t.name).join('; '), a.status,
+        tList.map(t => t.subDate || '').join('; '),
+        a.reviewer, a.reviewStatus, a.reviewedDate, a.remarks
+      ].map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'RALD_Report_' + (from || 'all') + '_to_' + (to || 'all') + '.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Report CSV downloaded', 'success');
+  } else {
+    const overdueItems = getOverdueItems();
+    const overdueSection = overdueItems.length > 0 ? `
+      <h3 style="color:#C62828; margin-top:24px;">Overdue Submissions (${overdueItems.length})</h3>
+      <table border="1" cellpadding="6" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:12px; margin-top:8px;">
+        <tr style="background:#FFEBEE;">
+          <th>Role</th><th>Name</th><th>Committee</th><th>Activity</th><th>Deadline</th><th>Days Overdue</th>
+        </tr>
+        ${overdueItems.map(o => `
+          <tr>
+            <td>${o.type === 'transcriber' ? 'Transcriber' : 'Reviewer'}</td>
+            <td><strong>${escapeHtml(o.name)}</strong></td>
+            <td>${escapeHtml(o.committee)}</td>
+            <td>${escapeHtml(o.activity)}</td>
+            <td>${formatDate(o.deadline)}</td>
+            <td style="color:#C62828; font-weight:bold;">${o.daysOverdue}</td>
+          </tr>
+        `).join('')}
+      </table>
+    ` : '';
+    
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`<!DOCTYPE html><html><head><title>RALD Report</title>
+      <style>body{font-family:'Segoe UI',sans-serif; padding:30px; color:#212121;}
+      table{width:100%; border-collapse:collapse; font-size:11px; margin-top:12px;}
+      th,td{border:1px solid #ccc; padding:6px 8px; text-align:left;}
+      th{background:#1B5E20; color:white;}
+      tr:nth-child(even){background:#f9f9f9;}
+      h1{color:#1B5E20; font-size:20px;} h2{color:#388E3C; font-size:14px; margin-top:20px;}
+      .footer{margin-top:30px; font-size:10px; color:#999; border-top:1px solid #ddd; padding-top:10px;}
+      </style></head><body>
+      <h1>RALD Transcript Tracker Report</h1>
+      <p>Revenues, Audit, and Legislation Division</p>
+      <p style="font-size:12px; color:#666;">Generated: ${new Date().toLocaleString()} | Range: ${from || 'All'} to ${to || 'All'} | Total: ${data.length} activities</p>
+      <table>
+        <tr><th>#</th><th>Date</th><th>Deadline</th><th>Committee</th><th>Activity</th><th>Venue</th><th>Transcribers</th><th>Status</th><th>Reviewer</th><th>Review Status</th><th>Remarks</th></tr>
+        ${data.map((a, i) => {
+          const tList = a.assignedTranscribers || [];
+          return `<tr>
+            <td>${i+1}</td><td>${a.date}</td><td>${a.deadline || '—'}</td><td>${escapeHtml(a.committee)}</td>
+            <td>${escapeHtml(a.activity)}</td><td>${escapeHtml(a.venue)}</td>
+            <td>${tList.map(t => escapeHtml(t.name) + (t.subDate ? ' ✓' : ' ✕')).join(', ')}</td>
+            <td>${a.status}</td><td>${escapeHtml(a.reviewer)}</td><td>${a.reviewStatus}</td><td>${escapeHtml(a.remarks)}</td>
+          </tr>`;
+        }).join('')}
+      </table>
+      ${overdueSection}
+      <div class="footer">RALD Transcript Tracker System — Confidential</div>
+      </body></html>`);
+    printWin.document.close();
+    printWin.print();
+    showToast('Print report generated', 'success');
+  }
+}
+
+// ============ AUTO-REFRESH ============
+setInterval(() => {
+  if (document.getElementById('mainApp').style.display !== 'none') {
+    renderStats();
+    renderOverduePanel();
+    renderTable();
+    updateBackupInfo();
+  }
+}, 60000);
+
+// ============ BOOT ============
+if (sessionStorage.getItem('raldLoggedIn') === 'true') {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'flex';
+  loadStateFromFirebase();
+} else {
+  loadStateFromFirebase();
+}
+</script>
+</body>
+</html>
